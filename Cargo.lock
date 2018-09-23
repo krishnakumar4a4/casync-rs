@@ -1,0 +1,23 @@
+[[package]]
+name = "casync-rs"
+version = "0.1.0"
+dependencies = [
+ "hash-roll 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "fmt-extra"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "hash-roll"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "fmt-extra 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[metadata]
+"checksum fmt-extra 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "bcf07567c33288997f035b293813c2769574d82f7ab47c9e9ba82577d3caacf6"
+"checksum hash-roll 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1aa40d6fd696ecda9fc00cad983f0fe4d7fdbe6f3954f975b17d0f24f93b61a9"

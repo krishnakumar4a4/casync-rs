@@ -1,0 +1,7 @@
+[package]
+name = "casync-rs"
+version = "0.1.0"
+authors = ["Krishna Kumar <krishnak@thoughtworks.com>"]
+
+[dependencies]
+hash-roll = "0.2.0"
