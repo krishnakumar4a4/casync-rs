@@ -2,6 +2,7 @@ extern crate hash_roll;
 extern crate clap;
 
 use std::fs::File;
+use std::fs::create_dir;
 use std::io::Error;
 use std::io::Read;
 use std::io::Write;
@@ -14,6 +15,7 @@ use std::collections::VecDeque;
 
 struct Chunker {
     chunk_count: u64,
+    chunk_store: std::string::String,
 }
 
 impl Chunker{
@@ -22,6 +24,10 @@ impl Chunker{
         let mut file_no = (self.chunk_count).to_string();
         file_no.push_str(".cnk");
         file_no
+    }
+
+    fn get_store_dir(self) -> std::string::String {
+       self.chunk_store.clone()
     }
 }
 
@@ -59,15 +65,22 @@ fn main() {
             m.hash()
         };
 
-        let mut chunker = Chunker{chunk_count: 0};
-
-        println!("Match found at {:?}",process_chunks(&mut b,h,file_to_read,&mut chunker));
+        let chunk_store_dir = "default.cstr".to_string();
+        let mut chunker = Chunker{chunk_count: 0, chunk_store: chunk_store_dir.clone()};
+        match create_chunk_store_dir(&chunk_store_dir) {
+            Ok(_) => {
+                println!("Match found at {:?}",process_chunks(&mut b,h,file_to_read,&mut chunker))
+            },
+            Err(e) => {
+                println!("Unable to create chunk store at {}, reason {}", chunk_store_dir, e);
+            }
+        }
     }
     else if matches.is_present("extract") {
         //Code to reassemble from chunks
         println!("Extracting from chunks");
         let mut file_to_write = get_file_to_write("out.txt");
-        for i in 1..20162{
+        for i in 1..81959{
             let mut file_no = (i).to_string();
             file_no.push_str(".cnk");
             let mut file_to_read = get_file_to_extract(&file_no);
@@ -78,8 +91,13 @@ fn main() {
     }
 }
 
+fn create_chunk_store_dir(chunk_store_dir: &str) -> std::io::Result<()> {
+    std::fs::create_dir(chunk_store_dir)?;
+    Ok(())
+}
+
 fn get_file_to_read() -> File {
-    File::open("input.txt").unwrap()
+    File::open("input_block").unwrap()
 }
 
 fn get_file_to_extract(file_name: &str) -> File {
@@ -91,7 +109,8 @@ fn get_file_to_write(file_name: &str) -> File {
 }
 
 fn create_chunk_file(chunker: &mut Chunker, data: &VecDeque<u8>) {
-    let mut file_to_write = get_file_to_write(&chunker.get_new_chunk_file_name());
+    let file_path_write = format!("{}/{}","default.cstr",&chunker.get_new_chunk_file_name());
+    let mut file_to_write = get_file_to_write(&file_path_write);
     file_to_write.write_all(data.as_slices().0);
 }
 
