@@ -1,35 +1,17 @@
 extern crate hash_roll;
 extern crate clap;
 
-use std::fs::File;
-use std::fs::create_dir;
-use std::io::Error;
 use std::io::Read;
 use std::io::Write;
 
 use hash_roll::buzhash::BuzHash;
 use hash_roll::buzhash::BuzHashBuf;
-use clap::{Arg, App, SubCommand};
+use clap::{Arg, App};
 
-use std::collections::VecDeque;
+mod chunker;
+mod io;
 
-struct Chunker {
-    chunk_count: u64,
-    chunk_store: std::string::String,
-}
-
-impl Chunker{
-    fn get_new_chunk_file_name(&mut self) -> std::string::String {
-        self.chunk_count += 1;
-        let mut file_no = (self.chunk_count).to_string();
-        file_no.push_str(".cnk");
-        file_no
-    }
-
-    fn get_store_dir(self) -> std::string::String {
-       self.chunk_store.clone()
-    }
-}
+use chunker::ChunkerConfig;
 
 fn main() {
     println!("Hello, world!");
@@ -43,13 +25,13 @@ fn main() {
              .help("Chunk the file").takes_value(false))
         .arg(Arg::with_name("extract")
              .short("e")
-             .long("extract")
+            .long("extract")
              .help("Create file from chunks").takes_value(false))
         .get_matches();
 
 
     if matches.is_present("make") {
-        let file_to_read = get_file_to_read();
+        let file_to_read = io::get_file_to_read();
         //let mut file_to_write = get_file_to_write();
 
         //let mut bytes = [0;1];
@@ -61,73 +43,34 @@ fn main() {
         let mut b = BuzHashBuf::from(BuzHash::with_capacity(7));
         let h = {
             let mut m = b.clone();
+            //This can be configured
             m.push(&[0,0,0,0,0,0,0]);
             m.hash()
         };
 
-        let chunk_store_dir = "default.cstr".to_string();
-        let mut chunker = Chunker{chunk_count: 0, chunk_store: chunk_store_dir.clone()};
-        match create_chunk_store_dir(&chunk_store_dir) {
+        let mut chunker_obj = ChunkerConfig::new();
+        match io::create_chunk_store_dir("default.cstr"){
             Ok(_) => {
-                println!("Match found at {:?}",process_chunks(&mut b,h,file_to_read,&mut chunker))
+                println!("Match found at {:?}",chunker::process_chunks(&mut b,h,file_to_read,&mut chunker_obj))
             },
             Err(e) => {
-                println!("Unable to create chunk store at {}, reason {}", chunk_store_dir, e);
+                println!("Unable to create chunk store at {}, reason {}", "default.cstr", e);
             }
         }
     }
     else if matches.is_present("extract") {
         //Code to reassemble from chunks
         println!("Extracting from chunks");
-        let mut file_to_write = get_file_to_write("out.txt");
+        let mut file_to_write = io::get_file_to_write("out.txt");
         for i in 1..81959{
-            let mut file_no = (i).to_string();
-            file_no.push_str(".cnk");
-            let mut file_to_read = get_file_to_extract(&file_no);
+            let mut path_to_chunk = "default.cstr/".to_string();
+            let file_no = (i).to_string();
+            path_to_chunk.push_str(&file_no);
+            path_to_chunk.push_str(".cnk");
+            let mut file_to_read = io::get_file_to_extract(&path_to_chunk);
             let mut buffer = Vec::new();
             file_to_read.read_to_end(&mut buffer);
             file_to_write.write_all(&buffer[..]);
         }
     }
 }
-
-fn create_chunk_store_dir(chunk_store_dir: &str) -> std::io::Result<()> {
-    std::fs::create_dir(chunk_store_dir)?;
-    Ok(())
-}
-
-fn get_file_to_read() -> File {
-    File::open("input_block").unwrap()
-}
-
-fn get_file_to_extract(file_name: &str) -> File {
-    File::open(file_name).unwrap()
-}
-
-fn get_file_to_write(file_name: &str) -> File {
-    File::create(file_name).unwrap()
-}
-
-fn create_chunk_file(chunker: &mut Chunker, data: &VecDeque<u8>) {
-    let file_path_write = format!("{}/{}","default.cstr",&chunker.get_new_chunk_file_name());
-    let mut file_to_write = get_file_to_write(&file_path_write);
-    file_to_write.write_all(data.as_slices().0);
-}
-
-fn process_chunks(b: &mut BuzHashBuf, other_hash: u8, file: File, chunker: &mut Chunker) -> usize {
-    let mut chunk_buf = VecDeque::new();
-    for (i, v) in file.bytes().enumerate() {
-        let each_byte = v.unwrap();
-        chunk_buf.push_back(each_byte.clone());
-        b.push_byte(each_byte);
-        if b.hash() == other_hash {
-            //println!("length of chunk, {}",chunk_buf.len());
-            create_chunk_file(chunker, &chunk_buf);
-            chunk_buf = VecDeque::new();
-            //return i+1;
-        }
-    }
-    create_chunk_file(chunker, &chunk_buf);
-    0
-}
-
