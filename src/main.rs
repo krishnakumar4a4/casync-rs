@@ -1,5 +1,6 @@
 extern crate hash_roll;
 extern crate clap;
+extern crate sha3;
 
 use std::io::Read;
 use std::io::Write;
@@ -8,14 +9,14 @@ use hash_roll::buzhash::BuzHash;
 use hash_roll::buzhash::BuzHashBuf;
 use clap::{Arg, App};
 
+
+
 mod chunker;
 mod io;
 
 use chunker::ChunkerConfig;
 
 fn main() {
-    println!("Hello, world!");
-
     let matches = App::new("casync-rs")
         .version("1.0")
         .author("krishna kumar <krishna.thokala2010@gmail.com>")
@@ -29,17 +30,8 @@ fn main() {
              .help("Create file from chunks").takes_value(false))
         .get_matches();
 
-
     if matches.is_present("make") {
         let file_to_read = io::get_file_to_read();
-        //let mut file_to_write = get_file_to_write();
-
-        //let mut bytes = [0;1];
-        //for byte in file_to_read.bytes(){
-        //    bytes[0] = byte.unwrap();
-        //    file_to_write.write(&bytes);
-        //}
-
         let mut b = BuzHashBuf::from(BuzHash::with_capacity(7));
         let h = {
             let mut m = b.clone();
@@ -51,7 +43,8 @@ fn main() {
         let mut chunker_obj = ChunkerConfig::new();
         match io::create_chunk_store_dir("default.cstr"){
             Ok(_) => {
-                println!("Match found at {:?}",chunker::process_chunks(&mut b,h,file_to_read,&mut chunker_obj))
+                let mut chunk_index_file = io::create_chunk_index_file("index.caidx");
+                println!("Match found at {:?}",chunker::process_chunks(&mut b,h,file_to_read,&mut chunker_obj, &mut chunk_index_file))
             },
             Err(e) => {
                 println!("Unable to create chunk store at {}, reason {}", "default.cstr", e);
