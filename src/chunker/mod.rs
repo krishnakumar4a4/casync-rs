@@ -8,9 +8,8 @@ use hash_roll::buzhash::BuzHashBuf;
 use std::io::Write;
 use std::io::Read;
 
-use sha3::{Digest, Sha3_256};
-//use self::crypto::digest::Digest;
-//use self::crypto::sha2::Sha256;
+use crypto::digest::Digest;
+use crypto::sha2::Sha256;
 
 use std::mem::transmute;
 use std::str;
@@ -42,6 +41,10 @@ impl ChunkerConfig{
     }
 }
 
+pub fn shall_break(chunk_size: usize) -> bool {
+    chunk_size > 512000 && chunk_size < 1024000
+}
+
 pub fn process_chunks(b: &mut BuzHashBuf, other_hash: u8, file: File, chunker: &mut ChunkerConfig, chunk_index_file: &mut File) -> usize {
 
     let mut chunk_buf = VecDeque::new();
@@ -50,7 +53,7 @@ pub fn process_chunks(b: &mut BuzHashBuf, other_hash: u8, file: File, chunker: &
         let each_byte = v.unwrap();
         chunk_buf.push_back(each_byte.clone());
         b.push_byte(each_byte);
-        if b.hash() == other_hash {
+        if (b.hash() == other_hash) && shall_break(chunk_buf.len()) {
             create_chunk_update_index(chunker, chunk_index_file, &chunk_buf);
             chunk_buf = VecDeque::new();
         }
@@ -59,37 +62,87 @@ pub fn process_chunks(b: &mut BuzHashBuf, other_hash: u8, file: File, chunker: &
     0
 }
 
-pub fn create_chunk_file(chunk_hash: &[u8],chunker: &mut ChunkerConfig, data: &VecDeque<u8>) {
-    //let file_path_write = format!("{}/{}","default.cstr",String::from_utf8_lossy(&chunk_hash));
-    let file_path_write = format!("{}/{:x}","default.cstr",chunk_hash);
-    println!("File to be created {:?}", file_path_write);
+pub fn create_chunk_file(chunk_hash: &str,chunker: &mut ChunkerConfig, data: &VecDeque<u8>) {
+    let file_path_write = format!("{}/{}","default.cstr",chunk_hash);
     let mut file_to_write = io::get_file_to_write(&file_path_write);
     file_to_write.write_all(data.as_slices().0);
 }
 
 pub fn create_chunk_update_index(chunker: &mut ChunkerConfig, chunk_index_file: &mut File, chunk_buf: &VecDeque<u8>) {
     // Write hash of 32bytes in index file
-    let chunk_hash = Sha3_256::digest(&chunk_buf.as_slices().0);
-    chunk_index_file.write_all(&(chunk_hash.as_slice()));
- 
+    let mut hasher = Sha256::new();
+    hasher.input(&chunk_buf.as_slices().0);
+    let chunk_hash = hasher.result_str();
+    let chunk_hash_bytes = chunk_hash.as_bytes();
     let chunk_size = chunk_buf.len();
+    let chunk_size_bytes = get_chunk_size_bytes(chunk_index_file, chunk_size);
+    if ! chunk_exists(chunk_index_file, chunk_hash_bytes, chunk_size_bytes) {
+        // Create the chunk
+        create_chunk_file(&chunk_hash, chunker, &chunk_buf); 
+    }
+    chunk_index_file.write_all(&chunk_hash_bytes);
 
     // Write size of chunk to standard 6bytes in index file
     // usize will be 32bits for 32bit target and 64bits for 64bit target
-    write_chunk_size_64_bit(chunk_index_file, chunk_size);
-
-    // Create the chunk
-    create_chunk_file(&chunk_hash, chunker, &chunk_buf);
+    write_chunk_size(chunk_index_file, chunk_size_bytes);
 }
 
 #[cfg(target_arch = "x86")]
-pub fn write_chunk_size_32_bit(chunk_index_file: &mut File, chunk_size: usize) {
+pub fn get_chunk_size_bytes(chunk_index_file: &mut File, chunk_size: usize) -> [u8; 6] {
     let size_to_write:[u8; 6] = unsafe { transmute(chunk_size.to_be()) };
-    chunk_index_file.write_all(&size_to_write);
+    size_to_write
 }
 
 #[cfg(target_arch = "x86_64")]
-pub fn write_chunk_size_64_bit(chunk_index_file: &mut File, chunk_size: usize) {
+pub fn get_chunk_size_bytes(chunk_index_file: &mut File, chunk_size: usize) -> [u8; 6] {
     let size_to_write:[u8; 8] = unsafe { transmute(chunk_size.to_be()) };
-    chunk_index_file.write_all(&size_to_write[2..8]);
+    let mut size_array:[u8; 6] = [0;6];
+    size_array.copy_from_slice(&size_to_write[2..8]);
+    size_array
+}
+
+pub fn write_chunk_size(chunk_index_file: &mut File, chunk_size: [u8; 6]) {
+    chunk_index_file.write_all(&chunk_size);
+}
+
+pub fn chunk_exists(chunk_index_file: &mut File, chunk_hash_bytes: &[u8], chunk_size_bytes: [u8; 6]) -> bool {
+    let mut read_buf = [0; 70];
+    let mut index_to_match: [u8;70] = [0; 70];
+
+    for i in 0..70 {
+        if i > 63 {
+            index_to_match[i] = chunk_size_bytes[i-64];
+            continue;
+        }
+       index_to_match[i] = chunk_hash_bytes[i];
+    };
+
+    let mut chunk_exists = false;
+    loop {
+        //TODO: Use seek for optimization, instead of read_exact
+        // and match_arrays
+        match chunk_index_file.read_exact(&mut read_buf) {
+            Ok(()) => (),
+            Err(err) => {
+                break;
+            }
+        };
+        if match_arrays(read_buf,index_to_match) {
+            //TODO: Can compute number of repeated chunks here
+            chunk_exists = true;
+            break;
+        }
+    };
+    chunk_exists
+}
+
+pub fn match_arrays(array1: [u8;70], array2: [u8;70]) -> bool {
+    let mut matched = true;
+    for i in 1..70 {
+        if ! (array1[i] == array2[i]) {
+            matched = false;
+            break;
+        }
+    }
+    matched
 }

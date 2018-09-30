@@ -6,4 +6,4 @@ authors = ["Krishna Kumar <krishnak@thoughtworks.com>"]
 [dependencies]
 hash-roll = "0.2.0"
 clap = "2.32.0"
-sha3 = "0.7.3"
+rust-crypto = "0.2.36"

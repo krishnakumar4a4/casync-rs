@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::Result;
 use std::fs::{self, DirBuilder};
+use std::fs::OpenOptions;
 
 pub fn create_chunk_store_dir(chunk_store_dir: &str) -> Result<()> {
     DirBuilder::new()
@@ -10,11 +11,15 @@ pub fn create_chunk_store_dir(chunk_store_dir: &str) -> Result<()> {
 }
 
 pub fn create_chunk_index_file(chunk_index_file: &str) -> File {
-    File::create(chunk_index_file).unwrap()
+    OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(chunk_index_file).unwrap()
 }
 
 pub fn get_file_to_read() -> File {
-    File::open("input.txt").unwrap()
+    File::open("input_block").unwrap()
 }
 
 pub fn get_file_to_extract(file_name: &str) -> File {

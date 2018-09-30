@@ -1,6 +1,6 @@
 extern crate hash_roll;
 extern crate clap;
-extern crate sha3;
+extern crate crypto;
 
 use std::io::Read;
 use std::io::Write;
@@ -32,11 +32,11 @@ fn main() {
 
     if matches.is_present("make") {
         let file_to_read = io::get_file_to_read();
-        let mut b = BuzHashBuf::from(BuzHash::with_capacity(7));
+        let mut b = BuzHashBuf::from(BuzHash::with_capacity(15));
         let h = {
             let mut m = b.clone();
             //This can be configured
-            m.push(&[0,0,0,0,0,0,0]);
+            m.push(&[9,45,128,100,122,9,45,128,100,122,9,45,128,100,122]);
             m.hash()
         };
 
