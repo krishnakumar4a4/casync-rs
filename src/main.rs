@@ -9,10 +9,9 @@ use hash_roll::buzhash::BuzHash;
 use hash_roll::buzhash::BuzHashBuf;
 use clap::{Arg, App};
 
-
-
 mod chunker;
 mod io;
+mod extracter;
 
 use chunker::ChunkerConfig;
 
@@ -31,7 +30,7 @@ fn main() {
         .get_matches();
 
     if matches.is_present("make") {
-        let file_to_read = io::get_file_to_read();
+        let file_to_read = io::get_file_to_read("input_block");
         let mut b = BuzHashBuf::from(BuzHash::with_capacity(15));
         let h = {
             let mut m = b.clone();
@@ -52,18 +51,6 @@ fn main() {
         }
     }
     else if matches.is_present("extract") {
-        //Code to reassemble from chunks
-        println!("Extracting from chunks");
-        let mut file_to_write = io::get_file_to_write("out.txt");
-        for i in 1..81959{
-            let mut path_to_chunk = "default.cstr/".to_string();
-            let file_no = (i).to_string();
-            path_to_chunk.push_str(&file_no);
-            path_to_chunk.push_str(".cnk");
-            let mut file_to_read = io::get_file_to_extract(&path_to_chunk);
-            let mut buffer = Vec::new();
-            file_to_read.read_to_end(&mut buffer);
-            file_to_write.write_all(&buffer[..]);
-        }
+        extracter::extract();
     }
 }

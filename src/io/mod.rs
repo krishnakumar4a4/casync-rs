@@ -18,14 +18,14 @@ pub fn create_chunk_index_file(chunk_index_file: &str) -> File {
         .open(chunk_index_file).unwrap()
 }
 
-pub fn get_file_to_read() -> File {
-    File::open("input_block").unwrap()
+pub fn get_file_to_read(filename: &str) -> File {
+    File::open(filename).unwrap()
 }
 
-pub fn get_file_to_extract(file_name: &str) -> File {
-    File::open(file_name).unwrap()
-}
+// pub fn get_file_to_extract(filename: &str) -> File {
+//     File::open(file_name).unwrap()
+// }
 
-pub fn get_file_to_write(file_name: &str) -> File {
-    File::create(file_name).unwrap()
+pub fn get_file_to_write(filename: &str) -> File {
+    File::create(filename).unwrap()
 }

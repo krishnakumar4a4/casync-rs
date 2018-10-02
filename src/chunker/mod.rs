@@ -27,11 +27,7 @@ impl ChunkerConfig{
         file_no.push_str(".cnk");
         file_no
     }
-
-    // pub fn get_store_dir(self) -> String {
-    //     self.chunk_store.clone()
-    // }
-
+    
     pub fn new() -> ChunkerConfig {
         let chunk_store_dir = "default.cstr".to_string();
         let chunk_index_file = "index.caidx".to_string();
@@ -63,7 +59,7 @@ pub fn process_chunks(b: &mut BuzHashBuf, other_hash: u8, file: File, chunker: &
 }
 
 pub fn create_chunk_file(chunk_hash: &str,chunker: &mut ChunkerConfig, data: &VecDeque<u8>) {
-    let file_path_write = format!("{}/{}","default.cstr",chunk_hash);
+    let file_path_write = format!("{}/{}.cacnk","default.cstr",chunk_hash);
     let mut file_to_write = io::get_file_to_write(&file_path_write);
     file_to_write.write_all(data.as_slices().0);
 }
@@ -78,7 +74,7 @@ pub fn create_chunk_update_index(chunker: &mut ChunkerConfig, chunk_index_file: 
     let chunk_size_bytes = get_chunk_size_bytes(chunk_index_file, chunk_size);
     if ! chunk_exists(chunk_index_file, chunk_hash_bytes, chunk_size_bytes) {
         // Create the chunk
-        create_chunk_file(&chunk_hash, chunker, &chunk_buf); 
+        compress_and_write_chunk(&chunk_hash, chunker, &chunk_buf);
     }
     chunk_index_file.write_all(&chunk_hash_bytes);
 
@@ -145,4 +141,10 @@ pub fn match_arrays(array1: [u8;70], array2: [u8;70]) -> bool {
         }
     }
     matched
+}
+
+pub fn compress_and_write_chunk(chunk_hash: &str,chunker: &mut ChunkerConfig, chunk_buf: &VecDeque<u8>) {
+    //TODO: Compression here
+
+    create_chunk_file(&chunk_hash, chunker, chunk_buf); 
 }
