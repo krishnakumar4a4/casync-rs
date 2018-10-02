@@ -2,7 +2,8 @@ use std::collections::VecDeque;
 use std::fs::File;
 use std::string::String;
 
-use io;
+use io_ops;
+use std::io;
 
 use hash_roll::buzhash::BuzHashBuf;
 use std::io::Write;
@@ -13,6 +14,8 @@ use crypto::sha2::Sha256;
 
 use std::mem::transmute;
 use std::str;
+
+use zstd::Encoder;
 
 pub struct ChunkerConfig {
     pub chunk_count: u64,
@@ -50,21 +53,15 @@ pub fn process_chunks(b: &mut BuzHashBuf, other_hash: u8, file: File, chunker: &
         chunk_buf.push_back(each_byte.clone());
         b.push_byte(each_byte);
         if (b.hash() == other_hash) && shall_break(chunk_buf.len()) {
-            create_chunk_update_index(chunker, chunk_index_file, &chunk_buf);
+            create_chunk_update_index(chunker, chunk_index_file, &mut chunk_buf);
             chunk_buf = VecDeque::new();
         }
     }
-    create_chunk_update_index(chunker, chunk_index_file, &chunk_buf);
+    create_chunk_update_index(chunker, chunk_index_file, &mut chunk_buf);
     0
 }
 
-pub fn create_chunk_file(chunk_hash: &str,chunker: &mut ChunkerConfig, data: &VecDeque<u8>) {
-    let file_path_write = format!("{}/{}.cacnk","default.cstr",chunk_hash);
-    let mut file_to_write = io::get_file_to_write(&file_path_write);
-    file_to_write.write_all(data.as_slices().0);
-}
-
-pub fn create_chunk_update_index(chunker: &mut ChunkerConfig, chunk_index_file: &mut File, chunk_buf: &VecDeque<u8>) {
+pub fn create_chunk_update_index(chunker: &mut ChunkerConfig, chunk_index_file: &mut File, chunk_buf: &mut VecDeque<u8>) {
     // Write hash of 32bytes in index file
     let mut hasher = Sha256::new();
     hasher.input(&chunk_buf.as_slices().0);
@@ -74,7 +71,7 @@ pub fn create_chunk_update_index(chunker: &mut ChunkerConfig, chunk_index_file: 
     let chunk_size_bytes = get_chunk_size_bytes(chunk_index_file, chunk_size);
     if ! chunk_exists(chunk_index_file, chunk_hash_bytes, chunk_size_bytes) {
         // Create the chunk
-        compress_and_write_chunk(&chunk_hash, chunker, &chunk_buf);
+        compress_and_write_chunk(&chunk_hash, chunker, chunk_buf);
     }
     chunk_index_file.write_all(&chunk_hash_bytes);
 
@@ -143,8 +140,16 @@ pub fn match_arrays(array1: [u8;70], array2: [u8;70]) -> bool {
     matched
 }
 
-pub fn compress_and_write_chunk(chunk_hash: &str,chunker: &mut ChunkerConfig, chunk_buf: &VecDeque<u8>) {
-    //TODO: Compression here
-
+pub fn compress_and_write_chunk(chunk_hash: &str,chunker: &mut ChunkerConfig, chunk_buf: &mut VecDeque<u8>) {
     create_chunk_file(&chunk_hash, chunker, chunk_buf); 
+}
+
+
+pub fn create_chunk_file(chunk_hash: &str,chunker: &mut ChunkerConfig, data: &mut VecDeque<u8>) {
+    let file_path_write = format!("{}/{}.cacnk","default.cstr",chunk_hash);
+    let mut file_to_write = io_ops::get_file_to_write(&file_path_write);
+
+    let mut encoder = Encoder::new(file_to_write,21).unwrap();
+    io::copy(&mut data.as_slices().0, &mut encoder);
+    encoder.finish();
 }

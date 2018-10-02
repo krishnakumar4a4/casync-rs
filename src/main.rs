@@ -1,6 +1,7 @@
 extern crate hash_roll;
 extern crate clap;
 extern crate crypto;
+extern crate zstd;
 
 use std::io::Read;
 use std::io::Write;
@@ -10,8 +11,8 @@ use hash_roll::buzhash::BuzHashBuf;
 use clap::{Arg, App};
 
 mod chunker;
-mod io;
-mod extracter;
+mod io_ops;
+mod assembler;
 
 use chunker::ChunkerConfig;
 
@@ -30,7 +31,7 @@ fn main() {
         .get_matches();
 
     if matches.is_present("make") {
-        let file_to_read = io::get_file_to_read("input_block");
+        let file_to_read = io_ops::get_file_to_read("input_block");
         let mut b = BuzHashBuf::from(BuzHash::with_capacity(15));
         let h = {
             let mut m = b.clone();
@@ -40,9 +41,9 @@ fn main() {
         };
 
         let mut chunker_obj = ChunkerConfig::new();
-        match io::create_chunk_store_dir("default.cstr"){
+        match io_ops::create_chunk_store_dir("default.cstr"){
             Ok(_) => {
-                let mut chunk_index_file = io::create_chunk_index_file("index.caidx");
+                let mut chunk_index_file = io_ops::create_chunk_index_file("index.caidx");
                 println!("Match found at {:?}",chunker::process_chunks(&mut b,h,file_to_read,&mut chunker_obj, &mut chunk_index_file))
             },
             Err(e) => {
@@ -51,6 +52,6 @@ fn main() {
         }
     }
     else if matches.is_present("extract") {
-        extracter::extract();
+        assembler::assemble();
     }
 }
