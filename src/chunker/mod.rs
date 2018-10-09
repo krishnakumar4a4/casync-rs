@@ -1,7 +1,5 @@
 use std::collections::VecDeque;
 use std::fs::File;
-use std::string::String;
-
 use io_ops;
 use std::io;
 
@@ -17,26 +15,47 @@ use std::str;
 
 use zstd::Encoder;
 
-pub struct ChunkerConfig {
+pub struct ChunkerConfig<'a> {
     pub chunk_count: u64,
-    pub chunk_store: String,
-    pub chunk_index_file: String,
+    pub default_chunk_store_dir: &'a str,
+    pub default_chunk_index_file: &'a str,
+    pub chunk_min_size: u32,
+    pub chunk_max_size: u32,
+    pub chunk_extension: &'a str,
+    pub input: &'a str,
+    pub output: &'a str,
 }
 
-impl ChunkerConfig{
-    pub fn get_new_chunk_file_name(&mut self) -> String {
-        self.chunk_count += 1;
-        let mut file_no = (self.chunk_count).to_string();
-        file_no.push_str(".cnk");
-        file_no
+impl<'a> ChunkerConfig<'a>{
+    pub fn new() -> ChunkerConfig<'a> {
+        let chunk_store_dir = "defaulti.castr";
+        let chunk_index_file = "index.caidx";
+        let input = "input_block";
+        ChunkerConfig{
+            chunk_count: 0,
+            default_chunk_store_dir: chunk_store_dir,
+            default_chunk_index_file: chunk_index_file,
+            input: input,
+            chunk_min_size: 512000,
+            chunk_max_size: 1024000,
+            chunk_extension: "cacnk",
+            output: "out"
+        }
     }
-    
-    pub fn new() -> ChunkerConfig {
-        let chunk_store_dir = "default.cstr".to_string();
-        let chunk_index_file = "index.caidx".to_string();
-        ChunkerConfig{chunk_count: 0,
-                      chunk_store: chunk_store_dir.clone(),
-                      chunk_index_file: chunk_index_file.clone()}
+    pub fn get_chunk_store_dir_name(&self) -> &'a str {
+        self.default_chunk_store_dir
+    }
+    pub fn get_chunk_index_file_name(&self) -> &'a str {
+        self.default_chunk_index_file
+    }
+    pub fn get_chunk_file_extension(&self) -> &'a str {
+        self.chunk_extension
+    }
+    pub fn get_input_file_name(&self) -> &'a str {
+        self.input
+    }
+    pub fn get_assembled_file_name(&self) -> &'a str {
+        self.output
     }
 }
 
@@ -44,7 +63,7 @@ pub fn shall_break(chunk_size: usize) -> bool {
     chunk_size > 512000 && chunk_size < 1024000
 }
 
-pub fn process_chunks(b: &mut BuzHashBuf, other_hash: u8, file: File, chunker: &mut ChunkerConfig, chunk_index_file: &mut File) -> usize {
+pub fn process_chunks(b: &mut BuzHashBuf, other_hash: u8, file: File, chunker: &mut ChunkerConfig, chunk_index_file: &mut File) {
 
     let mut chunk_buf = VecDeque::new();
 
@@ -58,7 +77,6 @@ pub fn process_chunks(b: &mut BuzHashBuf, other_hash: u8, file: File, chunker: &
         }
     }
     create_chunk_update_index(chunker, chunk_index_file, &mut chunk_buf);
-    0
 }
 
 pub fn create_chunk_update_index(chunker: &mut ChunkerConfig, chunk_index_file: &mut File, chunk_buf: &mut VecDeque<u8>) {
@@ -68,7 +86,7 @@ pub fn create_chunk_update_index(chunker: &mut ChunkerConfig, chunk_index_file: 
     let chunk_hash = hasher.result_str();
     let chunk_hash_bytes = chunk_hash.as_bytes();
     let chunk_size = chunk_buf.len();
-    let chunk_size_bytes = get_chunk_size_bytes(chunk_index_file, chunk_size);
+    let chunk_size_bytes = get_chunk_size_bytes(chunk_size);
     if ! chunk_exists(chunk_index_file, chunk_hash_bytes, chunk_size_bytes) {
         // Create the chunk
         compress_and_write_chunk(&chunk_hash, chunker, chunk_buf);
@@ -81,13 +99,13 @@ pub fn create_chunk_update_index(chunker: &mut ChunkerConfig, chunk_index_file: 
 }
 
 #[cfg(target_arch = "x86")]
-pub fn get_chunk_size_bytes(chunk_index_file: &mut File, chunk_size: usize) -> [u8; 6] {
+pub fn get_chunk_size_bytes(chunk_size: usize) -> [u8; 6] {
     let size_to_write:[u8; 6] = unsafe { transmute(chunk_size.to_be()) };
     size_to_write
 }
 
 #[cfg(target_arch = "x86_64")]
-pub fn get_chunk_size_bytes(chunk_index_file: &mut File, chunk_size: usize) -> [u8; 6] {
+pub fn get_chunk_size_bytes(chunk_size: usize) -> [u8; 6] {
     let size_to_write:[u8; 8] = unsafe { transmute(chunk_size.to_be()) };
     let mut size_array:[u8; 6] = [0;6];
     size_array.copy_from_slice(&size_to_write[2..8]);
@@ -116,7 +134,7 @@ pub fn chunk_exists(chunk_index_file: &mut File, chunk_hash_bytes: &[u8], chunk_
         // and match_arrays
         match chunk_index_file.read_exact(&mut read_buf) {
             Ok(()) => (),
-            Err(err) => {
+            Err(_err) => {
                 break;
             }
         };
@@ -146,8 +164,8 @@ pub fn compress_and_write_chunk(chunk_hash: &str,chunker: &mut ChunkerConfig, ch
 
 
 pub fn create_chunk_file(chunk_hash: &str,chunker: &mut ChunkerConfig, data: &mut VecDeque<u8>) {
-    let file_path_write = format!("{}/{}.cacnk","default.cstr",chunk_hash);
-    let mut file_to_write = io_ops::get_file_to_write(&file_path_write);
+    let file_path_write = format!("{}/{}.{}",chunker.get_chunk_store_dir_name(),chunk_hash, chunker.get_chunk_file_extension());
+    let file_to_write = io_ops::get_file_to_write(&file_path_write);
 
     let mut encoder = Encoder::new(file_to_write,21).unwrap();
     io::copy(&mut data.as_slices().0, &mut encoder);
