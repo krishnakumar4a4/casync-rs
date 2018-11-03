@@ -4,9 +4,13 @@ use std::fs::{DirBuilder};
 use std::fs::OpenOptions;
 
 pub fn create_chunk_store_dir(chunk_store_dir: &str) -> Result<()> {
+    create_dir(chunk_store_dir)
+}
+
+pub fn create_dir(path: &str) -> Result<()> {
     DirBuilder::new()
         .recursive(true)
-        .create(chunk_store_dir)?;
+        .create(path)?;
     Ok(())
 }
 

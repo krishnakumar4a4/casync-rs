@@ -2,6 +2,7 @@ extern crate hash_roll;
 extern crate clap;
 extern crate crypto;
 extern crate zstd;
+extern crate reqwest;
 
 use hash_roll::buzhash::BuzHash;
 use hash_roll::buzhash::BuzHashBuf;
@@ -10,6 +11,7 @@ use clap::{Arg, App};
 mod chunker;
 mod io_ops;
 mod assembler;
+mod extracter;
 
 use chunker::ChunkerConfig;
 
