@@ -100,7 +100,7 @@ pub fn create_chunk_update_index(chunker: &mut ChunkerConfig, chunk_index_file: 
         // Create the chunk
         compress_and_write_chunk(&chunk_hash, chunker, chunk_buf);
     }
-    chunk_index_file.write_all(&chunk_hash_bytes);
+    chunk_index_file.write_all(&chunk_hash_bytes).expect("Error: Cannot write to chunk file");
 
     // Write size of chunk to standard 6bytes in index file
     // usize will be 32bits for 32bit target and 64bits for 64bit target
@@ -122,7 +122,7 @@ pub fn get_chunk_size_bytes(chunk_size: usize) -> [u8; 6] {
 }
 
 pub fn write_chunk_size(chunk_index_file: &mut File, chunk_size: [u8; 6]) {
-    chunk_index_file.write_all(&chunk_size);
+    chunk_index_file.write_all(&chunk_size).expect("Error: Cannot write chunk size to index file");
 }
 
 pub fn chunk_exists(chunk_index_file: &mut File, chunk_hash_bytes: &[u8], chunk_size_bytes: [u8; 6]) -> bool {
@@ -174,9 +174,12 @@ pub fn compress_and_write_chunk(chunk_hash: &str,chunker: &mut ChunkerConfig, ch
 
 pub fn create_chunk_file(chunk_hash: &str,chunker: &mut ChunkerConfig, data: &mut VecDeque<u8>) {
     let file_path_write = format!("{}/{}.{}",chunker.get_chunk_store_dir_name(),chunk_hash, chunker.get_chunk_file_extension());
-    let file_to_write = io_ops::get_file_to_write(&file_path_write);
+    let file_to_write = match io_ops::get_file_to_write(&file_path_write) {
+        Ok(f) => f,
+        Err(e) => panic!("Error: Cannot open file {} to write chunk, {:?}", file_path_write, e)
+    };
 
     let mut encoder = Encoder::new(file_to_write,21).unwrap();
-    io::copy(&mut data.as_slices().0, &mut encoder);
-    encoder.finish();
+    io::copy(&mut data.as_slices().0, &mut encoder).expect("Error: Cannot write compressed data to file");
+    encoder.finish().expect("Error: Cannot finish zstd encoding on chunk data");
 }

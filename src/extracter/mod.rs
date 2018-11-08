@@ -8,7 +8,7 @@ pub struct HttpClient {
 
 pub trait ClientAdapter {
     fn new() -> Self;
-    fn downloadFile(&self, &mut String, String, String);
+    fn download_file(&self, &mut String, String, String);
 }
 
 impl ClientAdapter for HttpClient {
@@ -17,24 +17,29 @@ impl ClientAdapter for HttpClient {
             client: Client::new()
         }
     }
-    fn downloadFile(&self, server_url: &mut String, resource: String, dir: String) {
-        let mut dir_path = dir.clone();
-        io_ops::create_dir(&dir_path);
+    fn download_file(&self, server_url: &mut String, resource: String, dir: String) {
+        let dir_path = dir.clone();
+        io_ops::create_dir(&dir_path).expect("Error: cannot create directory to download  the chunks");
         let mut resource_path = "./".to_string();
         resource_path.push_str(&resource);
-        println!("file path to write {}",resource_path);
-        let mut file = io_ops::get_file_to_write(&resource_path);
+        let mut file = match io_ops::get_file_to_write(&resource_path) {
+            Ok(f) => f,
+            Err(e) => panic!("Error: Cannot open file {} to write, {:?}", resource_path, e)
+        };
         server_url.push_str("/");
         server_url.push_str(&resource_path);
         let mut buf: Vec<u8> = vec![];
-        println!("url is {}",server_url);
         match self.client.get(&*server_url).send() {
             Ok(mut resp) => {
-                resp.copy_to(&mut buf).unwrap();
-                file.write_all(&buf).unwrap();
+                if resp.status().is_success() {
+                    resp.copy_to(&mut buf).unwrap();
+                    file.write_all(&buf).unwrap();
+                } else {
+                    panic!("Error while downloading {}, status {:?}", server_url, resp.status());
+                }
             }
             Err(e) => {
-                println!("Could not download {}, status {:?}", server_url, e.status());
+                println!("Error while downloading {}, status {:?}", server_url, e.status());
             }
         }
     }

@@ -53,7 +53,8 @@ fn main() {
                     .arg(Arg::with_name("file")
                          .short("f")
                          .long("file")
-                         .help("input file for make and outout file for extract")
+                         .help("input fi
+le for make and outout file for extract")
                          .takes_value(true)
                          .required(true)))
                     .get_matches();
@@ -65,7 +66,11 @@ fn main() {
             let io_file = sub_com.value_of("file");
             let mut chunker_config = ChunkerConfig::new(index_file, store_dir, io_file);
 
-            let file_to_read = io_ops::get_file_to_read(chunker_config.get_input_file_name());
+            let input_file_name = chunker_config.get_input_file_name();
+            let file_to_read = match io_ops::get_file_to_read(input_file_name) {
+                Ok(f) => f,
+                Err(e) => panic!("Error: Cannot open input file {}, {:?}", input_file_name, e)
+            };
             let mut b = BuzHashBuf::from(BuzHash::with_capacity(15));
             let h = {
                 let mut m = b.clone();
@@ -79,7 +84,11 @@ fn main() {
 
             match io_ops::create_chunk_store_dir(chunk_store_dir_name){
                 Ok(_) => {
-                    let mut chunk_index_file = io_ops::create_chunk_index_file(chunk_index_file_name);
+                    let mut chunk_index_file = match io_ops::create_chunk_index_file(chunk_index_file_name)
+                    {
+                        Ok(f) => f,
+                        Err(e) => panic!("Error: Cannot open index file {}, {:?}", chunk_index_file_name, e)
+                    };
                     chunker::process_chunks(&mut b,h,file_to_read,&mut chunker_config, &mut chunk_index_file)
                 },
                 Err(e) => {
